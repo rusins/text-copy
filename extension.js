@@ -18,7 +18,7 @@ class TextCopyButton extends PanelMenu.Button {
         this._busy = false;
 
         this.add_child(new St.Icon({
-            icon_name: 'insert-text-symbolic',
+            icon_name: 'insert-text-frame-symbolic',
             style_class: 'system-status-icon',
         }));
 
