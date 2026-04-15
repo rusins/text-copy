@@ -1,0 +1,9 @@
+{
+  "uuid": "text-copy@rusins.github.com",
+  "name": "Text Copy",
+  "description": "Screenshot an area, run OCR with Tesseract, and copy the result to clipboard",
+  "version": 1,
+  "shell-version": ["45", "46", "47", "48", "49"],
+  "settings-schema": "org.gnome.shell.extensions.text-copy",
+  "url": ""
+}

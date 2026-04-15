@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.text-copy"
+          path="/org/gnome/shell/extensions/text-copy/">
+    <key name="ocr-language" type="s">
+      <default>'eng'</default>
+      <summary>OCR language</summary>
+      <description>Tesseract language code used for OCR (e.g. eng, deu, fra, rus)</description>
+    </key>
+  </schema>
+</schemalist>
