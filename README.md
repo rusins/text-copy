@@ -11,11 +11,6 @@ Click the panel icon, select an area of your screen, and the text in that area i
 ## Requirements
 
 - **GNOME Shell** 45–49
-- **gnome-screenshot** — for capturing the selected area
-  ```
-  sudo pacman -S gnome-screenshot        # Arch/Manjaro
-  sudo apt install gnome-screenshot      # Debian/Ubuntu
-  ```
 - **Tesseract OCR** — for recognizing the text
   ```
   sudo pacman -S tesseract               # Arch/Manjaro
@@ -26,6 +21,7 @@ Click the panel icon, select an area of your screen, and the text in that area i
   sudo pacman -S tesseract-data-eng      # Arch/Manjaro
   sudo apt install tesseract-ocr-eng     # Debian/Ubuntu
   ```
+  (`-lav` for Latvian :) )
 - **wl-clipboard** — for copying to clipboard on Wayland
   ```
   sudo pacman -S wl-clipboard            # Arch/Manjaro
@@ -35,18 +31,22 @@ Click the panel icon, select an area of your screen, and the text in that area i
 ## Installation
 
 1. Clone or download this repository.
-2. Compile the GSettings schema:
-   ```
-   glib-compile-schemas schemas/
-   ```
-3. Symlink (or copy) the directory to the GNOME extensions folder:
+2. Symlink (or copy) the directory to the GNOME extensions folder:
    ```
    ln -s "$(pwd)" ~/.local/share/gnome-shell/extensions/text-copy@rusins.github.com
    ```
-4. Enable the extension:
+3. Enable the extension:
    ```
    gnome-extensions enable text-copy@rusins.github.com
    ```
+4. Log out and back in for the extension to take effect!
+
+## Development
+
+If you edit `schemas/*.gschema.xml`, recompile the schema before reloading:
+```
+glib-compile-schemas schemas/
+```
 
 ## Configuration
 
