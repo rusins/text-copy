@@ -138,7 +138,6 @@ class TextCopyButton extends PanelMenu.Button {
         proc.communicate_utf8_async(text, null, (_p, res) => {
             try {
                 proc.communicate_utf8_finish(res);
-                Main.notify('Text Copy', 'Text copied to clipboard!');
             } catch (e) {
                 Main.notifyError('Text Copy', `wl-copy failed: ${e.message}`);
             }
