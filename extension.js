@@ -7,15 +7,13 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const TMP_DIR = '/tmp/text-copy';
-const SCREENSHOT_PATH = '/tmp/text-copy/ocr.png';
-const TEXT_BASE = '/tmp/text-copy/text';      // tesseract appends .txt
-const TEXT_PATH = '/tmp/text-copy/text.txt';
+const TEXT_BASE = '/tmp/text-copy/text';
+const TEXT_PATH  = '/tmp/text-copy/text.txt';
 
 const TextCopyButton = GObject.registerClass(
 class TextCopyButton extends PanelMenu.Button {
     _init(settings) {
-        super._init(0.0, 'Text Copy', true); // dontCreateMenu = true
+        super._init(0.0, 'Text Copy', true);
         this._settings = settings;
         this._busy = false;
 
@@ -35,51 +33,59 @@ class TextCopyButton extends PanelMenu.Button {
         if (this._busy) return;
         this._busy = true;
 
-        GLib.mkdir_with_parents(TMP_DIR, 0o755);
-
         const lang = this._settings.get_string('ocr-language') || 'eng';
 
-        let proc;
-        try {
-            proc = Gio.Subprocess.new(
-                ['gnome-screenshot', '--area', `--file=${SCREENSHOT_PATH}`],
-                Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE
-            );
-        } catch (e) {
-            Main.notifyError('Text Copy', `Could not start gnome-screenshot: ${e.message}`);
+        if (!Main.screenshotUI) {
+            Main.notifyError('Text Copy', 'GNOME Shell screenshot UI unavailable');
             this._busy = false;
             return;
         }
 
-        proc.wait_async(null, (_p, res) => {
+        // Listen for the native screenshot UI signals
+        Main.screenshotUI.disconnectObject(this);
+        Main.screenshotUI.connectObject(
+            'screenshot-taken', (_ui, file) => {
+                Main.screenshotUI.disconnectObject(this);
+                const imgPath = file?.get_path?.();
+                if (imgPath)
+                    this._runTesseract(imgPath, lang);
+                else
+                    this._busy = false;
+            },
+            'closed', () => {
+                Main.screenshotUI.disconnectObject(this);
+                this._busy = false;
+            },
+            this
+        );
+
+        // mode 2 = screenshot-only (hides screen-recording option)
+        // Falls back to no-arg open() for older shell versions
+        try {
+            Main.screenshotUI.open(2);
+        } catch (_e) {
             try {
-                proc.wait_finish(res);
+                Main.screenshotUI.open();
             } catch (e) {
-                console.error('Text Copy:', e);
+                Main.screenshotUI.disconnectObject(this);
+                Main.notifyError('Text Copy', `Could not open screenshot UI: ${e.message}`);
                 this._busy = false;
-                return;
             }
-
-            // If the file doesn't exist the user cancelled — just reset quietly
-            if (!Gio.File.new_for_path(SCREENSHOT_PATH).query_exists(null)) {
-                this._busy = false;
-                return;
-            }
-
-            this._runTesseract(lang);
-        });
+        }
     }
 
-    _runTesseract(lang) {
+    _runTesseract(imgPath, lang) {
+        GLib.mkdir_with_parents('/tmp/text-copy', 0o755);
+
         let proc;
         try {
             proc = Gio.Subprocess.new(
-                ['tesseract', SCREENSHOT_PATH, TEXT_BASE, '-l', lang],
+                ['tesseract', imgPath, TEXT_BASE, '-l', lang],
                 Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_PIPE
             );
         } catch (e) {
             Main.notifyError('Text Copy', `Could not start tesseract: ${e.message}`);
-            this._cleanup();
+            this._cleanup(imgPath);
             return;
         }
 
@@ -89,46 +95,43 @@ class TextCopyButton extends PanelMenu.Button {
                 [, , stderr] = proc.communicate_utf8_finish(res);
             } catch (e) {
                 Main.notifyError('Text Copy', `Tesseract error: ${e.message}`);
-                this._cleanup();
+                this._cleanup(imgPath);
                 return;
             }
 
             if (!proc.get_successful()) {
                 Main.notifyError('Text Copy', `Tesseract failed: ${stderr?.trim() || 'unknown error'}`);
-                this._cleanup();
+                this._cleanup(imgPath);
                 return;
             }
 
-            this._copyToClipboard();
+            this._copyToClipboard(imgPath);
         });
     }
 
-    _copyToClipboard() {
+    _copyToClipboard(imgPath) {
         let text;
         try {
             const [, contents] = Gio.File.new_for_path(TEXT_PATH).load_contents(null);
             text = new TextDecoder().decode(contents).trim();
         } catch (e) {
             Main.notifyError('Text Copy', `Could not read OCR result: ${e.message}`);
-            this._cleanup();
+            this._cleanup(imgPath);
             return;
         }
 
         if (!text) {
             Main.notify('Text Copy', 'No text found in screenshot');
-            this._cleanup();
+            this._cleanup(imgPath);
             return;
         }
 
         let proc;
         try {
-            proc = Gio.Subprocess.new(
-                ['wl-copy'],
-                Gio.SubprocessFlags.STDIN_PIPE
-            );
+            proc = Gio.Subprocess.new(['wl-copy'], Gio.SubprocessFlags.STDIN_PIPE);
         } catch (e) {
             Main.notifyError('Text Copy', `Could not start wl-copy: ${e.message}`);
-            this._cleanup();
+            this._cleanup(imgPath);
             return;
         }
 
@@ -139,16 +142,14 @@ class TextCopyButton extends PanelMenu.Button {
             } catch (e) {
                 Main.notifyError('Text Copy', `wl-copy failed: ${e.message}`);
             }
-            this._cleanup();
+            this._cleanup(imgPath);
         });
     }
 
-    _cleanup() {
+    _cleanup(imgPath) {
         this._busy = false;
-        for (const path of [SCREENSHOT_PATH, TEXT_PATH]) {
-            try {
-                Gio.File.new_for_path(path).delete(null);
-            } catch (_e) { /* ignore if already gone */ }
+        for (const path of [imgPath, TEXT_PATH]) {
+            try { Gio.File.new_for_path(path).delete(null); } catch (_e) {}
         }
     }
 });
